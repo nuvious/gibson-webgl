@@ -106,6 +106,7 @@ var skyBox ;
 
 // First things first, let's get some data about the buildings we're
 // gonna draw
+/*
 console.log("Pulling metadata about redshift tables...");
 $.getJSON(
   "https://" + location.host + "/static/tables",
@@ -118,6 +119,27 @@ $.getJSON(
     console.log(err);
   }
 );
+*/
+
+function generateRandomTableData(totalTables) {
+  const tableData = [];
+  
+  for (let i = 0; i < totalTables; i++) {
+    const table = '#' + Math.floor(Math.random() * 16777215).toString(16); // Random hex value
+    const rows = Math.pow(Math.floor(Math.random() * 62 + 2),2) // Random number between 10 and 100
+    
+    tableData.push({
+      table: table,
+      rows: rows
+    });
+  }
+  
+  return tableData;
+}
+
+// Example usage:
+totalTables = 256;
+tableData = generateRandomTableData(totalTables);
 
 function placeBuildingsOnGrid(gridSizeLength, tableData) {
   /*
@@ -337,24 +359,17 @@ function blowUpBuilding(buildingObj){
 
 function start() {
 
-  supportsWebVR = !(navigator.getVRDevices === undefined);
+  // supportsWebVR = !(navigator.getVRDevices === undefined);
+  supportsWebVR = false;
 
   var havePointerLock = 'pointerLockElement' in document || 'mozPointerLockElement' in document || 'webkitPointerLockElement' in document;
 
   if (havePointerLock) {
     var element = document.body;
     var pointerlockchange = function (event) {
-      if (document.pointerLockElement === element || document.mozPointerLockElement === element || document.webkitPointerLockElement === element) {
-        controlsEnabled = true;
-        controls.enabled = true;
-        blocker.style.display = 'none';
-      } else {
-        controls.enabled = false;
-        blocker.style.display = '-webkit-box';
-        blocker.style.display = '-moz-box';
-        blocker.style.display = 'box';
-        instructions.style.display = '';
-      }
+      controlsEnabled = true;
+      controls.enabled = true;
+      blocker.style.display = 'none';
     };
 
     var pointerlockerror = function (event) {
@@ -381,8 +396,6 @@ function start() {
 
         var fullscreenchange = function (event) {
           if (document.fullscreenElement === element || document.mozFullscreenElement === element || document.mozFullScreenElement === element) {
-            document.removeEventListener('fullscreenchange', fullscreenchange);
-            document.removeEventListener('mozfullscreenchange', fullscreenchange);
             element.requestPointerLock();
           }
         };
@@ -391,7 +404,8 @@ function start() {
         document.addEventListener('mozfullscreenchange', fullscreenchange, false);
         element.requestFullscreen = element.requestFullscreen || element.mozRequestFullscreen || element.mozRequestFullScreen || element.webkitRequestFullscreen;
         element.requestFullscreen();
-    vrEffect.setFullScreen(true);
+        if (vrEffect !== undefined)
+          vrEffect.setFullScreen(true);
 
       } else {
         element.requestPointerLock();
@@ -622,16 +636,17 @@ function init() {
 
   document.addEventListener('mousedown', onDocumentMouseDown, false);
 
+  /*
   if (supportsWebVR) {
     vrControls = new THREE.VRControls(camera);
     vrEffect = new THREE.VREffect(renderer, function (error) {
     });
-  } else {
+  } else {*/
     // Add mouse controls!
-    controls = new THREE.PointerLockControls(camera);
-    controls.getObject().position.y = 100;
-    scene.add(controls.getObject());
-  }
+  controls = new THREE.PointerLockControls(camera);
+  controls.getObject().position.y = 100;
+  scene.add(controls.getObject());
+  //}
 
   ambienceSfx = new Audio('/dist/sfx/Telegraphy_-_04_-_Monopole.mp3');
   ambienceSfx.preload = 'auto';
@@ -773,73 +788,69 @@ function onWindowResize() {
 function animate() {
 
   // Get timestep
-  // TODO: we're also doing this in render, we should refactor so that
-  // all position recalculations are done here
   var time = performance.now();
   var delta = (time - prevTime) / 1000;
 
   // Update the position of the flying little sprites
   var bounds = PERSPECTIVE_BOUNDARY;
-  for(var i = 0; i < dataPackets.length; i++){
+  for (var i = 0; i < dataPackets.length; i++) {
     dataPackets[i].obj.position.add(dataPackets[i].speed);
-    if(dataPackets[i].obj.position.x < -bounds) {
+    if (dataPackets[i].obj.position.x < -bounds) {
       dataPackets[i].obj.position.x = bounds;
-    } else if(dataPackets[i].obj.position.x > bounds){
+    } else if (dataPackets[i].obj.position.x > bounds) {
       dataPackets[i].obj.position.x = -bounds;
     }
-    if(dataPackets[i].obj.position.z < -bounds) {
+    if (dataPackets[i].obj.position.z < -bounds) {
       dataPackets[i].obj.position.z = bounds;
-    } else if(dataPackets[i].obj.position.z > bounds){
+    } else if (dataPackets[i].obj.position.z > bounds) {
       dataPackets[i].obj.position.z = -bounds;
     }
   }
 
-  // Iterate over the building state container to see if anything's
-  // changed
-  for (var i=0; i < BUILDING_GRID.length; i++) {
-    for (var j=0; j < BUILDING_GRID[i].length; j++) {
+  // Iterate over the building state container to see if anything's changed
+  for (var i = 0; i < BUILDING_GRID.length; i++) {
+    for (var j = 0; j < BUILDING_GRID[i].length; j++) {
 
       var _buildingMeta = BUILDING_GRID[i][j];
 
       if (_buildingMeta !== undefined) {
         // Make all the faces of the text meshes face the camera
-        if (_buildingMeta.alive){
+        if (_buildingMeta.alive) {
           if (supportsWebVR) {
             _buildingMeta.textMesh.quaternion.copy(camera.quaternion);
           } else {
             _buildingMeta.textMesh.lookAt(controls.getObject().position);
           }
 
-          // Rotate the texture of the building to make it look like
-          // it's computing something
+          // Rotate the texture of the building to make it look like it's computing something
           if (Math.random() > 0.9) {
             _buildingMeta.buildingObj.material.map = _.sample(
               towerTextures[_buildingMeta.buildingType]
-           );
+            );
             _buildingMeta.buildingObj.material.needsUpdate = true;
           }
         } else {
           // Kill the building textMesh
-          if (_buildingMeta.textMesh !== undefined){
+          if (_buildingMeta.textMesh !== undefined) {
             var _msg = "DROP TABLE " + _buildingMeta.tableName + ";";
             $('.terminal>.terminal-content').append(_msg + "<br >");
             $('.terminal')[0].scrollTop = $('.terminal')[0].scrollHeight;
             scene.remove(_buildingMeta.textMesh);
-            delete _buildingMeta.textMesh;
+            // _buildingMeta.textMesh = null; // Set to null instead of delete
           }
         }
 
         // Rotate and decay the velocity of the exploding fragment
-        for (var fragIndex=0; fragIndex<_buildingMeta.fragments.length; fragIndex++){
+        for (var fragIndex = 0; fragIndex < _buildingMeta.fragments.length; fragIndex++) {
           var _fragContainer = _buildingMeta.fragments[fragIndex];
 
-          if (_fragContainer.fragment !== undefined){
+          if (_fragContainer.fragment !== undefined) {
 
             _fragContainer.fragment.rotation.set(
               Math.random() * MAX_ROTATION * 2 - MAX_ROTATION,
               Math.random() * MAX_ROTATION * 2 - MAX_ROTATION,
               Math.random() * MAX_ROTATION * 2 - MAX_ROTATION
-           );
+            );
 
             _fragContainer.direction.x -= _fragContainer.direction.x * FRAGMENT_LATERAL_RESISTANCE_COEFFICIENT * delta;
             _fragContainer.direction.z -= _fragContainer.direction.z * FRAGMENT_LATERAL_RESISTANCE_COEFFICIENT * delta;
@@ -851,9 +862,9 @@ function animate() {
 
             if (_fragContainer.fragment.position.y < 0) {
               scene.remove(_fragContainer.fragment);
-              delete _fragContainer.fragment;
-              delete _fragContainer.direction;
-              delete _fragContainer;
+              // _fragContainer.fragment = null; // Set to null instead of delete
+              // _fragContainer.direction = null; // Set to null instead of delete
+              // _fragContainer = null; // Set to null instead of delete
             }
           }
 
